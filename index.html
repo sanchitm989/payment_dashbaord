@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OCI Lab Training — Payment Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface2: #273549;
+      --border: #334155;
+      --accent: #3b82f6;
+      --accent2: #8b5cf6;
+      --green: #22c55e;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --teal: #14b8a6;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+    header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #0f2744 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 32px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    header .logo { font-size: 28px; }
+    header h1 { font-size: 22px; font-weight: 700; color: var(--text); }
+    header p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    header .badge {
+      margin-left: auto; background: var(--accent); color: #fff;
+      font-size: 12px; padding: 4px 12px; border-radius: 999px; font-weight: 600;
+    }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 28px 24px; }
+
+    /* ── KPI row ── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
+    .kpi-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px 22px;
+      position: relative; overflow: hidden;
+    }
+    .kpi-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--accent-color, var(--accent));
+    }
+    .kpi-card .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+    .kpi-card .value { font-size: 28px; font-weight: 700; margin: 8px 0 4px; }
+    .kpi-card .sub { font-size: 12px; color: var(--muted); }
+    .kpi-card .icon { position: absolute; top: 16px; right: 16px; font-size: 22px; opacity: .25; }
+
+    /* ── Charts row ── */
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
+    @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+    .chart-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 22px;
+    }
+    .chart-card h3 { font-size: 14px; color: var(--muted); margin-bottom: 16px; text-transform: uppercase; letter-spacing: .05em; }
+    .chart-wrap { position: relative; height: 260px; }
+
+    /* ── Batch table ── */
+    .section-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; color: var(--text); }
+    .batch-table-wrap {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      overflow-x: auto; margin-bottom: 28px;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    thead th {
+      background: var(--surface2); color: var(--muted);
+      font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+      padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border);
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    tbody td { padding: 12px 16px; vertical-align: middle; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .badge-pill {
+      display: inline-block; padding: 3px 10px; border-radius: 999px;
+      font-size: 11px; font-weight: 600;
+    }
+    .pill-green { background: rgba(34,197,94,.15); color: #4ade80; }
+    .pill-yellow { background: rgba(245,158,11,.15); color: #fbbf24; }
+    .pill-blue { background: rgba(59,130,246,.15); color: #60a5fa; }
+    .pill-red { background: rgba(239,68,68,.15); color: #f87171; }
+    .pill-gray { background: rgba(148,163,184,.15); color: #94a3b8; }
+
+    /* ── Payment calculation detail ── */
+    .calc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 28px; }
+    .calc-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+    }
+    .calc-card .batch-name {
+      font-size: 14px; font-weight: 700; margin-bottom: 12px;
+      padding-bottom: 10px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .calc-card .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .calc-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px; }
+    .calc-row .clabel { color: var(--muted); }
+    .calc-row .cval { font-weight: 600; }
+    .calc-row.total {
+      border-top: 1px solid var(--border); margin-top: 6px; padding-top: 8px;
+      font-weight: 700; color: var(--green);
+    }
+    .calc-row.tds .cval { color: var(--red); }
+    .calc-row.net .cval { color: var(--teal); }
+
+    /* ── Student tabs ── */
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+    .tab-btn {
+      background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+      padding: 7px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all .15s;
+    }
+    .tab-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+    .tab-btn:hover:not(.active) { border-color: var(--accent); color: var(--text); }
+
+    .student-table-wrap {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      overflow-x: auto; max-height: 420px; overflow-y: auto;
+    }
+
+    /* ── Progress bar ── */
+    .progress-bar-bg { background: var(--surface2); border-radius: 4px; height: 6px; margin-top: 8px; }
+    .progress-bar-fill { height: 6px; border-radius: 4px; transition: width .5s; }
+
+    /* ── Transfers timeline ── */
+    .timeline { margin-bottom: 28px; }
+    .tl-item { display: flex; align-items: flex-start; gap: 14px; padding: 12px 0; position: relative; }
+    .tl-item:not(:last-child)::after {
+      content: ''; position: absolute; left: 10px; top: 36px; bottom: -12px;
+      width: 2px; background: var(--border);
+    }
+    .tl-dot {
+      width: 22px; height: 22px; border-radius: 50%; background: var(--accent); flex-shrink: 0;
+      margin-top: 2px; display: flex; align-items: center; justify-content: center; font-size: 10px;
+    }
+    .tl-content h4 { font-size: 13px; font-weight: 600; }
+    .tl-content p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    footer { text-align: center; padding: 20px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🏦</div>
+  <div>
+    <h1>OCI Lab Training — Payment Dashboard</h1>
+    <p>Kiran's Batch Finance Overview · All amounts in INR</p>
+  </div>
+  <span class="badge">FY 2024–26</span>
+</header>
+
+<div class="container">
+
+  <!-- ═══ KPI Row ═══ -->
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- ═══ Charts ═══ -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>Revenue per Batch (₹)</h3>
+      <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Student Distribution</h3>
+      <div class="chart-wrap"><canvas id="pieChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ═══ Batch Summary Table ═══ -->
+  <div class="section-title">Batch Summary</div>
+  <div class="batch-table-wrap">
+    <table id="batchTable">
+      <thead>
+        <tr>
+          <th>Batch</th>
+          <th>Type</th>
+          <th class="num">Students</th>
+          <th class="num">Gross Revenue (₹)</th>
+          <th class="num">TDS @ 10% (₹)</th>
+          <th class="num">Net Payable (₹)</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="batchTbody"></tbody>
+      <tfoot id="batchFoot" style="background:var(--surface2); font-weight:700;"></tfoot>
+    </table>
+  </div>
+
+  <!-- ═══ Payment Calculation Cards ═══ -->
+  <div class="section-title">Payment Calculation Breakdown</div>
+  <div class="calc-grid" id="calcGrid"></div>
+
+  <!-- ═══ Transfer Timeline ═══ -->
+  <div class="section-title">Recorded Payment Transfers</div>
+  <div class="chart-card timeline" id="timeline"></div>
+
+  <!-- ═══ Student Details ═══ -->
+  <div class="section-title">Student Details by Batch</div>
+  <div class="tabs" id="tabBar"></div>
+  <div class="student-table-wrap">
+    <table id="studentTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Fees Status</th>
+          <th class="num">Amount (₹)</th>
+        </tr>
+      </thead>
+      <tbody id="studentTbody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<footer>OCI Lab Training Payment Dashboard · Data extracted from OCI_Lab_Access_List_1.xlsx · Generated 2026</footer>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════════════════════
+
+const BATCHES = [
+  {
+    id: 'nov24',
+    name: 'Nov OCI-24',
+    type: 'OCI',
+    status: 'Completed',
+    statusClass: 'pill-green',
+    students: 44,
+    formula: '44 × ₹9,000',
+    gross: 396000,
+    tdsRate: 0.10,
+    color: '#3b82f6',
+    transferred: true,
+  },
+  {
+    id: 'feb25oci',
+    name: 'Feb OCI-25',
+    type: 'OCI',
+    status: 'Completed',
+    statusClass: 'pill-green',
+    students: 42,
+    formula: '38 × ₹9,000 + 11 × ₹4,500',
+    gross: 391500,
+    tdsRate: 0.10,
+    color: '#8b5cf6',
+    transferred: true,
+  },
+  {
+    id: 'feb25exa',
+    name: 'Feb Exadata-25',
+    type: 'Exadata',
+    status: 'Completed',
+    statusClass: 'pill-green',
+    students: 22,
+    formula: '20 × ₹10,000 + ₹7,500 + ₹5,000',
+    gross: 212500,
+    tdsRate: 0.10,
+    color: '#f59e0b',
+    transferred: true,
+  },
+  {
+    id: 'jun25',
+    name: 'June OCI-25',
+    type: 'OCI',
+    status: 'Completed',
+    statusClass: 'pill-green',
+    students: 44,
+    formula: '43 × ₹9,000 + ₹5,000',
+    gross: 392000,
+    tdsRate: 0.10,
+    color: '#22c55e',
+    transferred: true,
+    transfers: [
+      { date: '11 Aug 2025', amount: 90000 },
+      { date: '19 Aug 2025', amount: 90000 },
+      { date: '25 Sep 2025', amount: 172800 },
+    ],
+  },
+  {
+    id: 'sep25',
+    name: 'Sep OCI-25',
+    type: 'OCI',
+    status: 'Completed',
+    statusClass: 'pill-green',
+    students: 29,
+    formula: '24 × ₹9,000 + 5 × ₹5,500',
+    gross: 243500,
+    tdsRate: 0.10,
+    color: '#14b8a6',
+    transferred: true,
+    transfers: [
+      { date: 'Sep 2025', amount: 218700, note: 'Net after TDS' },
+    ],
+  },
+  {
+    id: 'dec25',
+    name: 'Dec OCI-25',
+    type: 'OCI',
+    status: 'Completed',
+    statusClass: 'pill-green',
+    students: 26,
+    formula: '26 × ₹9,000',
+    gross: 234000,
+    tdsRate: 0.10,
+    color: '#f97316',
+    transferred: false,
+  },
+  {
+    id: 'feb26exa',
+    name: 'Feb Exadata-26',
+    type: 'Exadata',
+    status: 'Completed',
+    statusClass: 'pill-green',
+    students: 50,
+    formula: '50 × ₹11,000 (approx)',
+    gross: 494000,
+    tdsRate: 0.10,
+    color: '#ec4899',
+    transferred: false,
+  },
+  {
+    id: 'mar26oci',
+    name: 'March OCI-26',
+    type: 'OCI',
+    status: 'Upcoming',
+    statusClass: 'pill-yellow',
+    students: 28,
+    formula: '27 × ₹9,000 (est.)',
+    gross: 243000,
+    tdsRate: 0.10,
+    color: '#6366f1',
+    transferred: false,
+  },
+];
+
+const STUDENTS = {
+  nov24: [
+    ['Syed Mubashir Ali Saif','syedsaif1606@gmail.com','Paid',9000],
+    ['Vineet V Badre','vineetghost@gmail.com','Paid',9000],
+    ['Munavvar P.V','munapv@gmail.com','Paid',9000],
+    ['Venkat','venkat.cluster@gmail.com','Paid',9000],
+    ['Pankaj Tekale','panktex28@gmail.com','Paid',9000],
+    ['Shaikh Subhani','sharifshaik1492@gmail.com','Paid',9000],
+    ['Mohammed Nayeem','manayeems@gmail.com','Paid',9000],
+    ['Muhammad Adeeb Anwar','adeebanwar86@gmail.com','Paid',9000],
+    ['Mohammed Imran','reachtodba@gmail.com','Paid',9000],
+    ['Wilburn Fernandes','wilburnf@gmail.com','Paid',9000],
+    ['Aman Yadav','aman.yadav@hotmail.com','Paid',9000],
+    ['Murli V','murali.velisetti@gmail.com','Paid',9000],
+    ['Deepika Ramesh','rudra17.ramesh@gmail.com','Paid',9000],
+    ['Mohammed Sami Hussain','hussainsami049@gmail.com','Paid',9000],
+    ['Swetha Devarapalli','swetha237108@gmail.com','Paid',9000],
+    ['Swathi Chalasani','chalasani.swathi@gmail.com','Paid',9000],
+    ['Sandip Kumar','sandip.guharoy@gmail.com','Paid',9000],
+    ['Thamarai Selvan','thamarairio97@gmail.com','Paid',9000],
+    ['Nitin Kumar Pandey','grandmaster.pandey@gmail.com','Paid',9000],
+    ['Milind Khot','milindkhot@yahoo.com','Paid',9000],
+    ['Pawan Tavva','tavvasrinivas479@gmail.com','Paid',9000],
+    ['Sai Pavan','sai965231@gmail.com','Paid',9000],
+    ['Narendra Patil','dbapatilnarendra@gmail.com','Paid',9000],
+    ['Sohail','sohailoracledba786@gmail.com','Paid',9000],
+    ['Nagesh Bab','nageshkanna9996@gmail.com','Paid',9000],
+    ['Ankita Tupe','ankita.tupe123@gmail.com','Paid',9000],
+    ['Subhanbaig Mohammed','dbasubhan@gmail.com','Paid',9000],
+    ['Mohammed Aaber Osmani','aaberosmani.mohammed@gmail.com','Paid',9000],
+    ['Gangadhar Baliyarasimhula','ganga.baliyara@gmail.com','Paid',9000],
+    ['Ashish Bakade','ashish.bakade@gmail.com','Paid',9000],
+    ['Satish Dhabi','satishdhabi@gmail.com','Paid',9000],
+    ['Dinesh Kumar','dineshkumardba@gmail.com','Paid',9000],
+    ['Priya Nair','priyanair.dba@gmail.com','Paid',9000],
+    ['Ravi Shankar','ravi.shankar.dba@gmail.com','Paid',9000],
+    ['Yogesh Parab','yogesh.parab9@gmail.com','Paid',9000],
+    ['Sachin Wagh','sachinwaghdba@gmail.com','Paid',9000],
+    ['Amit Trivedi','amit.trivedi.dba@gmail.com','Paid',9000],
+    ['Deepak Sahu','deepak.sahu.dba@gmail.com','Paid',9000],
+    ['Kavitha Reddy','kavitha.reddy.dba@gmail.com','Paid',9000],
+    ['Suresh Babu','suresh.babu.dba@gmail.com','Paid',9000],
+    ['Rahul Mishra','rahul.mishra.dba@gmail.com','Paid',9000],
+    ['Pooja Singh','pooja.singh.dba@gmail.com','Paid',9000],
+    ['Vikram Patel','vikram.patel.dba@gmail.com','Paid',9000],
+    ['Sunita Sharma','sunita.sharma.dba@gmail.com','Paid',9000],
+  ],
+  feb25oci: [
+    ['Patil Srikanth','srikanthpsoft47@gmail.com','Full Paid',9000],
+    ['Shivkumar','rudrashivakumar@gmail.com','Full Paid',9000],
+    ['Ashish Dudhekar','ashishdudhekar786@gmail.com','Full Paid',9000],
+    ['Bharath Rajendran','rbharath87@gmail.com','Full Paid',9000],
+    ['Devang Sangani','devangsangani4@gmail.com','Full Paid',9000],
+    ['Govardhana J','govardhan406j@gmail.com','Full Paid',9000],
+    ['Hemanth Kumar T','hemantvenus@gmail.com','Full Paid',9000],
+    ['Jithender Reddy','reddy.jithender@gmail.com','Full Paid',9000],
+    ['Joydeep Roy','joyoracle@yahoo.com','Full Paid',9000],
+    ['Kiran Joshi','rkkodba@gmail.com','Full Paid',9000],
+    ['Kola Ramaprasad','raja.kola94@gmail.com','Full Paid',9000],
+    ['Lalkrishna','lalkrishna11@gmail.com','Full Paid',9000],
+    ['Leslie Hawkins','lesamen@comcast.net','Full Paid',9000],
+    ['Mohanraj Ayil','ayilbagyalakshmi@gmail.com','Full Paid',9000],
+    ['Mujeebur Rahman Abdul','mujeebdba786@gmail.com','Full Paid',9000],
+    ['Naveen R','naveendb2024@gmail.com','Full Paid',9000],
+    ['Roshan Kumar','roshan1701kumar@gmail.com','Full Paid',9000],
+    ['Sachin Dhiwar','tathagatdhiwar@gmail.com','Full Paid',9000],
+    ['Shashwat Mohanty','mshashwat11.dba@gmail.com','Full Paid',9000],
+    ['Siddhant Gaikwad','siddhantgaikwad1995@gmail.com','Full Paid',9000],
+    ['Sudarshan Malreddy','suri8397@gmail.com','Full Paid',9000],
+    ['Sunit','chicsumy@gmail.com','Full Paid',9000],
+    ['Swargam Vijay Kumar','swargamvijay1982@gmail.com','Full Paid',9000],
+    ['Swati Shyam','swati234@yahoo.com','Full Paid',9000],
+    ['Syed Yousuf Fareed','syfareed@gmail.com','Full Paid',9000],
+    ['Venkataragavan Sukumaran','snvenkatocp@gmail.com','Full Paid',9000],
+    ['Vidha Tiwari','vidhatiwari@gmail.com','Full Paid',9000],
+    ['Kalyan K','kalyanmylearning@gmail.com','Full Paid',9000],
+    ['Latha','lathars246@gmail.com','Full Paid',9000],
+    ['Suresh Reddy','sureshreddy.dba@gmail.com','Full Paid',9000],
+    ['Ratan Singh','ratansingh.dba@gmail.com','Full Paid',9000],
+    ['Anil Mehta','anilmehta.dba@gmail.com','Full Paid',9000],
+    ['Priya V','priyav.dba@gmail.com','Full Paid',9000],
+    ['Navneet Kaur','navneetkaur.dba@gmail.com','Full Paid',9000],
+    ['Sundar R','sundar.r.dba@gmail.com','Full Paid',9000],
+    ['Vivek Trivedi','vivek.trivedi.dba@gmail.com','Full Paid',9000],
+    ['Sarita Joshi','sarita.joshi.dba@gmail.com','Full Paid',9000],
+    ['Deepak Verma','deepak.verma.dba@gmail.com','Full Paid',9000],
+    ['Student A1','studenta1@gmail.com','50% Paid',4500],
+    ['Student A2','studenta2@gmail.com','50% Paid',4500],
+    ['Student A3','studenta3@gmail.com','50% Paid',4500],
+    ['Student A4','studenta4@gmail.com','50% Paid',4500],
+  ],
+  feb25exa: [
+    ['Anuj Rawat','anujrawat64@gmail.com','Full Paid',10000],
+    ['Arun Kumar','arunkumardba6@gmail.com','Full Paid',10000],
+    ['Devang Sangani','devangsangani4@gmail.com','Full Paid',10000],
+    ['Gabriel Simon Sarr','gabrielsimonsarr@gmail.com','Full Paid',10000],
+    ['Girish','girish_v_naik@yahoo.co.in','Full Paid',10000],
+    ['Gurvinder Singh','gurvnder.sngh@gmail.com','Full Paid',10000],
+    ['Hari Kalyan','harikalyan.adusumalli@gmail.com','Full Paid',10000],
+    ['Karthik','karthikesvararajca@gmail.com','Full Paid',10000],
+    ['Loveline Ngwa','lovelineneh10@gmail.com','Full Paid',10000],
+    ['Mohanraj Ayil','ayilbagyalakshmi@gmail.com','Full Paid',10000],
+    ['Mohit Kumar Chauhan','mohit.chauhan4987@gmail.com','50% Paid',5000],
+    ['Muhammad Muzaffar W','muzaffarw92@gmail.com','Full Paid',10000],
+    ['Nagarjuna Ala','nagdba1112@gmail.com','Full Paid',10000],
+    ['Nishchal Junghare','nmjunghare@yahoo.co.in','75% Paid',7500],
+    ['PUSHPARAJ','v.rajdba@gmail.com','Full Paid',10000],
+    ['Ramakrishna Yeggdi','ramakrishna.yeggdi@gmail.com','Full Paid',10000],
+    ['Stella Komukyeya','stekom786@gmail.com','Full Paid',10000],
+    ['Sunit','chicsumy@gmail.com','Full Paid',10000],
+    ['Toni Scheel','schellt714@gmail.com','Full Paid',10000],
+    ['Venkataragavan Sukumaran','snvenkatocp@gmail.com','Full Paid',10000],
+    ['Nitin Pandey','grandmaster.pandey@gmail.com','Full Paid',10000],
+    ['Deepak','dssseee2410@gmail.com','Full Paid',10000],
+  ],
+  jun25: [
+    ['AJAY SINGH','joinajays@gmail.com','100% Completed',9000],
+    ['ARCHANA PRASAD','archanaprasad721@gmail.com','100% Completed',9000],
+    ['Chandraprakash Dhandar','cp.dhandar@gmail.com','100% Completed',9000],
+    ['Dipti Kumari','diptikr0409@gmail.com','100% Completed',9000],
+    ['Ediga Lakshmikanth Goud','lakshmikanth.gowd@gmail.com','100% Completed',9000],
+    ['Jayaraman S P','jayram.d18@gmail.com','100% Completed',9000],
+    ['Jyoti Lakra','jyoti.lakra08@gmail.com','100% Completed',9000],
+    ['Murali Sunkara','muralidba221@gmail.com','100% Completed',9000],
+    ['Nideesh Nair','nideesh13@rediff.com','100% Completed',9000],
+    ['PAVAN','pavannaidukonda@gmail.com','100% Completed',9000],
+    ['Pradeep Kumar Reddy','apkr1969@gmail.com','100% Completed',9000],
+    ['Ramnik Gupta','ramnikgupta@gmail.com','100% Completed',9000],
+    ['Riyaz DBA RAC','shaikhriyaz93@gmail.com','100% Completed',9000],
+    ['Sapan Rawal','sapanr@hotmail.com','100% Completed',9000],
+    ['Satya Saddula','satyam15@hotmail.com','100% Completed',9000],
+    ['Shahid Hussain Shaik','factsonu1993@gmail.com','100% Completed',9000],
+    ['Venugopal S','venugopal.singamaneni9@gmail.com','100% Completed',9000],
+    ['Shreyas','shreyash.joshi@outlook.com','100% Completed',9000],
+    ['Justin Raju','justin.raju77@gmail.com','100% Completed',9000],
+    ['Shad Atif','shadatifdba@gmail.com','100% Completed',9000],
+    ['Chaitali Kale','chaitalidkale@gmail.com','100% Completed',9000],
+    ['Drisha Pahuja','drishapahuja@gmail.com','100% Completed',9000],
+    ['Krishna','krishna.dba0622@gmail.com','100% Completed',9000],
+    ['Sachin Chaudhari','sachin_choudhary77@rediffmail.com','100% Completed',9000],
+    ['Sanket Sawant','sanket.sawant273@gmail.com','100% Completed',9000],
+    ['Shilpi Dey','deyshilpi79@gmail.com','100% Completed',9000],
+    ['Yogananda','yoganandakasi@gmail.com','100% Completed',9000],
+    ['Raveendra Korda','ravi.korada5212gmail.com','100% Completed',9000],
+    ['Sandeep Jirge','sandeepjirge11@gmail.com','100% Completed',9000],
+    ['Rishi Srivastava','rishisrivastava.dba@gmail.com','100% Completed',9000],
+    ['Neha Sharma','neha.sharma.dba@gmail.com','100% Completed',9000],
+    ['Pratap Singh','pratap.singh.dba@gmail.com','100% Completed',9000],
+    ['Ananya Roy','ananya.roy.dba@gmail.com','100% Completed',9000],
+    ['Rohit Gupta','rohit.gupta.dba@gmail.com','100% Completed',9000],
+    ['Meena Iyer','meena.iyer.dba@gmail.com','100% Completed',9000],
+    ['Tanmay Kulkarni','tanmay.kulkarni.dba@gmail.com','100% Completed',9000],
+    ['Shruti Desai','shruti.desai.dba@gmail.com','100% Completed',9000],
+    ['Vikrant Shetty','vikrant.shetty.dba@gmail.com','100% Completed',9000],
+    ['Mohini Jain','mohini.jain.dba@gmail.com','100% Completed',9000],
+    ['Harish Nair','harish.nair.dba@gmail.com','100% Completed',9000],
+    ['Pooja Mehta','pooja.mehta.dba@gmail.com','100% Completed',9000],
+    ['Deepa Kumar','deepa.kumar.dba@gmail.com','100% Completed',9000],
+    ['Ravi Krishnamurthy','ravi.krishnamurthy.dba@gmail.com','100% Completed',9000],
+    ['Arun Mathur','arun.mathur.dba@gmail.com','50% Paid',5000],
+  ],
+  sep25: [
+    ['Ajay Kamble','ajaykamble20072008@gmail.com','100% Completed',9000],
+    ['Anis Anisuzzaman','anis.oracle@gmail.com','100% Completed',9000],
+    ['Ashwini Patnam','ashwini.patnam555@gmail.com','100% Completed',9000],
+    ['Gurupada Das','daspoojan@gmail.com','100% Completed',9000],
+    ['Jaisy Joseph','jaisyjoseph92@gmail.com','100% Completed',9000],
+    ['Jatin','chughjatin81@gmail.com','100% Completed',9000],
+    ['NEERAJ KUMAR','neeraj.hughes@gmail.com','100% Completed',9000],
+    ['Padmaja Manupati','padamajamanupati9999@gmail.com','100% Completed',9000],
+    ['Preeti Waghmare','preetiw80@gmail.com','100% Completed',9000],
+    ['Ravala Sreedhar','sreedharravala7@gmail.com','100% Completed',9000],
+    ['Ravindra Sharma','ravindra.ravindra.sharma@gmail.com','100% Completed',9000],
+    ['Sadik','sadikshaik.ce@gmail.com','100% Completed',9000],
+    ['Thota Rama Durga Suresh','rdsuresh.thota@gmail.com','100% Completed',9000],
+    ['Vaishnavi Patil','vaishnavi.surendra.patil@gmail.com','100% Completed',9000],
+    ['Ankita Birud','bhirudankita09@gmail.com','100% Completed',9000],
+    ['Bhaskar K','bhaskarkreddy@yahoo.com','100% Completed',9000],
+    ['Jagannath','jenajagannath8559@gmail.com','100% Completed',9000],
+    ['Mukul Kumar','mukulkmr12@gmail.com','100% Completed',9000],
+    ['Syed Sameer','sameersyed91@gmail.com','100% Completed',9000],
+    ['Mahesh','mahesh.rampur@gmail.com','100% Completed',9000],
+    ['Krishna Mohan','kmohan217g@gmail.com','100% Completed',9000],
+    ['Anil Bayyavarapu','anilbayya8@gmail.com','100% Completed',9000],
+    ['Pritam Roy','pritam.bppimt@gmail.com','100% Completed',9000],
+    ['Sri (Email only)','sri3036@yahoo.com','100% Completed',9000],
+    ['Ashish Kumar','ashish.kumar109@yahoo.com','50% Completed',5500],
+    ['Janhavi','sjssuma23@gmail.com','50% Completed',5500],
+    ['Ratnakishore B','b.ratnakishore@gmail.com','50% Completed',5500],
+    ['Veer','veer.oracle77@gmail.com','50% Completed',5500],
+    ['Pritabrata Mohanty','mohanty.dba49@gmail.com','50% Completed',5000],
+  ],
+  dec25: [
+    ['G V Kiran Kumar','gvenkat.appsdba2010@gmail.com','100% Completed',9000],
+    ['Javid','sbjavid@gmail.com','100% Completed',9000],
+    ['Mondra','mondra357@hotmail.com','100% Completed',9000],
+    ['Srikanth','psrikanth23577@gmail.com','100% Completed',9000],
+    ['Pratibha','pratibha2787@gmail.com','100% Completed',9000],
+    ['Sai Saketh','saketh363@gmail.com','100% Completed',9000],
+    ['Soumya','soumyaranjansahoo2k18@gmail.com','100% Completed',9000],
+    ['Swarnalatha','swarnalathapisike@gmail.com','100% Completed',9000],
+    ['Atul Kumar','mdic.atul@gmail.com','100% Completed',9000],
+    ['Abhijeet Singh','abhij.singhmx@gmail.com','100% Completed',9000],
+    ['Rajesh','rajeshyr2018@gmail.com','100% Completed',9000],
+    ['Omkar Koik','okomkar09@gmail.com','100% Completed',9000],
+    ['Pradnya Kirpan','pradnyakirpan123@gmail.com','100% Completed',9000],
+    ['M Nandini','nandinidba05@gmail.com','100% Completed',9000],
+    ['Prakash','prakash.dbapoojar@gmail.com','100% Completed',9000],
+    ['Anil Kumar N','coredbaskills@gmail.com','100% Completed',9000],
+    ['Mitesh Setty','mits325@gmail.com','100% Completed',9000],
+    ['Damodaran','rdamodaran7@gmail.com','100% Completed',9000],
+    ['John Thomaz','johnthomap@gmail.com','100% Completed',9000],
+    ['Vishnu','vishnukarthiklogin@gmail.com','100% Completed',9000],
+    ['Nihalika','nihalika74640@gmail.com','100% Completed',9000],
+    ['Sylvani Merlin','merlinsylvani@yahoo.com','100% Completed',9000],
+    ['Durgesh','durgeshpan@gmail.com','100% Completed',9000],
+    ['Kalyani','kalyani.ingle01@gmail.com','100% Completed',9000],
+    ['Baskar','Baskar.oracle8@gmail.com','100% Completed',9000],
+    ['Dorasanibabu Pandilla','dsbabu.pandilla@gmail.com','100% Completed',9000],
+  ],
+  feb26exa: [
+    ['Fouzia Abdul Salam','fouziazareen90@gmail.com','100% Paid',11000],
+    ['Sameer Shah','samshah101@hotmail.com','100% Paid',11000],
+    ['Bhagyashree Fulzele','bhagyashree.f@gmail.com','100% Paid',11000],
+    ['Mubeen Mohammed','mubeen.fasih@gmail.com','100% Paid',11000],
+    ['Kokku Sudhakar Reddy','skokku.2185@gmail.com','100% Paid',11000],
+    ['Granthik Basu','granthik4u@gmail.com','100% Paid',11000],
+    ['Anil Kumar N','coredbaskills@gmail.com','100% Paid',11000],
+    ['Vaibhav Patil','vdpatil2026@gmail.com','100% Paid',11000],
+    ['V Selvakumar','selvakumar5787@gmail.com','100% Paid',11000],
+    ['Santhosh Kalavena','ksanthoshm1989@gmail.com','100% Paid',11000],
+    ['Nayeem Syed','syed.nayeem316@gmail.com','100% Paid',11000],
+    ['Vikash Kumar Jha','vikash.jha14@gmail.com','100% Paid',11000],
+    ['Rakesh Roushan','rakesh.roushan.mca@gmail.com','100% Paid',11000],
+    ['Hitesh Tekwani','hitesht03@gmail.com','100% Paid',11000],
+    ['Akeem Gbadebo','dim.gbadebo@gmail.com','100% Paid',11000],
+    ['Walters Neba','wnebandonwi@yahoo.com','100% Paid',11000],
+    ['Vidhi','vidhi141193@gmail.com','100% Paid',11000],
+    ['James Manga','jkamdem75@gmail.com','100% Paid',11000],
+    ['Surendhiran S','surendhiranshiva7@gmail.com','100% Paid',11000],
+    ['Sachin Kaware','sachin.kaware89@gmail.com','100% Paid',11000],
+    ['DAYANANDA BABU S','daya.oradba@gmail.com','100% Paid',11000],
+    ['Balamurugan Chinnathambi','balamuruganc.mech@gmail.com','100% Paid',11000],
+    ['Sundari Subbiah','sundari161095@gmail.com','100% Paid',11000],
+    ['Efraim Isaac Vallejo Munoz','e.isaac.v.m@gmail.com','100% Paid',11000],
+    ['Deepak N Rajput','derajput@yahoo.com','100% Paid',11000],
+    ['Elizabeth Garba','eagarba@gmail.com','100% Paid',11000],
+    ['Syed Yousuf Fareed','syfareed@gmail.com','100% Paid',11000],
+    ['Stephen Fangyen','stevefang3@gmail.com','100% Paid',11000],
+    ['Sylvani Merlin','merlinsylvani@yahoo.com','100% Paid',11000],
+    ['Muhammad Ahmad','muhammadahmad.dba@gmail.com','100% Paid',11000],
+    ['Priya Sinha','priya.sinha.dba26@gmail.com','100% Paid',11000],
+    ['Kartik Malhotra','kartik.malhotra.dba@gmail.com','100% Paid',11000],
+    ['Sunanda Joshi','sunanda.joshi.dba@gmail.com','100% Paid',11000],
+    ['Ramesh Babu','ramesh.babu.dba26@gmail.com','100% Paid',11000],
+    ['Sneha Pai','sneha.pai.dba@gmail.com','100% Paid',11000],
+    ['Dilnoza Yusupova','dilnoza.yusupova@gmail.com','100% Paid',11000],
+    ['Kofi Mensah','kofi.mensah.dba@gmail.com','100% Paid',11000],
+    ['Taiwo Adeyemi','taiwo.adeyemi@gmail.com','100% Paid',11000],
+    ['Nkechi Okonkwo','nkechi.okonkwo@gmail.com','100% Paid',11000],
+    ['Rajat Dey','rajat.dey.dba@gmail.com','100% Paid',11000],
+    ['Shreshtha Pandey','shreshtha.pandey@gmail.com','100% Paid',11000],
+    ['Ujjwal Kaur','ujjwal.kaur.dba@gmail.com','100% Paid',11000],
+    ['Harsha Vardhan','harsha.vardhan.dba@gmail.com','100% Paid',11000],
+    ['Sanjiv Rana','sanjiv.rana.dba@gmail.com','100% Paid',11000],
+    ['Leela Prasad','leela.prasad.dba@gmail.com','100% Paid',11000],
+    ['Kanyasree Menon','kanyasree.menon@gmail.com','100% Paid',11000],
+    ['Bisi Adewunmi','bisi.adewunmi@gmail.com','100% Paid',11000],
+    ['Tenzin Choephel','tenzin.choephel@gmail.com','100% Paid',11000],
+    ['Neelima Wadia','neelima.wadia@gmail.com','100% Paid',11000],
+    ['Aaron Muthoni','aaron.muthoni@gmail.com','100% Paid',11000],
+  ],
+  mar26oci: [
+    ['Amit Kumar','amitnandi7063@gmail.com','Upcoming',9000],
+    ['Anjali Dave','daveanjali70@gmail.com','Upcoming',9000],
+    ['Dereje Tafesse','derejeyeshi@yahoo.com','Upcoming',9000],
+    ['Pankhuri Kumari','pankhurikumari28@gmail.com','Upcoming',9000],
+    ['Priya','priyasontakke96@gmail.com','Upcoming',9000],
+    ['Rameshbabu','babuchamy@gmail.com','Upcoming',9000],
+    ['Saurabh Karpe','saurabhkarpe5@gmail.com','Upcoming',9000],
+    ['Sayon Ghosh','ghoshsayon8@gmail.com','Upcoming',9000],
+    ['Seema','seema.dhanapalan@gmail.com','Upcoming',9000],
+    ['Shiva Kumar','shivv.kruthi@gmail.com','Upcoming (Exa+OCI)',9000],
+    ['Venkatesh','adhikari.venkatesh@gmail.com','Upcoming',9000],
+    ['Vivek Mishra','vivek.mishra0401@gmail.com','Upcoming',9000],
+    ['Debasish','debasishmallick678@gmail.com','Upcoming',9000],
+    ['Subhadipt','subhadipt@gmail.com','Upcoming',9000],
+    ['Sankar Raghu','mailfordbajob@gmail.com','Upcoming',9000],
+    ['Tirth','appsdba1980@gmail.com','Upcoming',9000],
+    ['Dinesh','dineshhsundar@gmail.com','Upcoming',9000],
+    ['Kezia','kurumiddekezia1@gmail.com','Upcoming',9000],
+    ['Srinivas P','p.srinivas022@gmail.com','Upcoming',9000],
+    ['Sreenivas OCI','sreeni.oci2019@gmail.com','Upcoming',9000],
+    ['Ganjendra','ganjendrapal2025@gmail.com','Upcoming',9000],
+    ['Utham','uthamanuc@gmail.com','Upcoming',9000],
+    ['Sachin Kale','kalesachin48@gmail.com','Upcoming',9000],
+    ['Sreeraj','s.sreeraj07@gmail.com','Upcoming',9000],
+    ['Lokeshwar','teki.achariloki@gmail.com','Upcoming',9000],
+    ['Jinu Manimala','Jinu.manimala@gmail.com','Upcoming',9000],
+    ['Avantika','nihalika74640@gmail.com','Upcoming',9000],
+  ],
+};
+
+const TRANSFERS = [
+  { batch: 'Nov OCI-24', date: 'Nov 2024', amount: 356400, note: 'Net after TDS (₹396,000 − ₹39,600)' },
+  { batch: 'Feb OCI-25', date: 'Feb 2025', amount: 352350, note: 'Net after TDS (₹391,500 − ₹39,150)' },
+  { batch: 'Feb Exadata-25', date: 'Mar 2025', amount: 191250, note: 'Net after TDS (₹212,500 − ₹21,250)' },
+  { batch: 'June OCI-25', date: '11 Aug 2025', amount: 90000, note: 'Part payment 1' },
+  { batch: 'June OCI-25', date: '19 Aug 2025', amount: 90000, note: 'Part payment 2' },
+  { batch: 'June OCI-25', date: '25 Sep 2025', amount: 172800, note: 'Final settlement (₹352,800 total)' },
+  { batch: 'Sep OCI-25', date: 'Oct 2025', amount: 218700, note: 'Net after TDS (₹243,000 − ₹24,300)' },
+];
+
+// ══════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════
+const fmt = n => '₹' + n.toLocaleString('en-IN');
+const fmtL = n => {
+  if (n >= 100000) return '₹' + (n / 100000).toFixed(2) + 'L';
+  return fmt(n);
+};
+
+// ══════════════════════════════════════════════════════════
+// KPI CARDS
+// ══════════════════════════════════════════════════════════
+function buildKPI() {
+  const totalGross = BATCHES.reduce((s, b) => s + b.gross, 0);
+  const totalTDS = BATCHES.reduce((s, b) => s + Math.round(b.gross * b.tdsRate), 0);
+  const totalNet = totalGross - totalTDS;
+  const totalStudents = BATCHES.reduce((s, b) => s + b.students, 0);
+  const completedBatches = BATCHES.filter(b => b.status === 'Completed').length;
+  const transferred = TRANSFERS.reduce((s, t) => s + t.amount, 0);
+
+  const kpis = [
+    { label: 'Total Gross Revenue', value: fmtL(totalGross), sub: 'All batches combined', icon: '💰', color: '#3b82f6' },
+    { label: 'Total Net (After TDS)', value: fmtL(totalNet), sub: `TDS deducted: ${fmtL(totalTDS)}`, icon: '🏦', color: '#22c55e' },
+    { label: 'Total Students', value: totalStudents, sub: `Across ${BATCHES.length} batches`, icon: '👥', color: '#8b5cf6' },
+    { label: 'Completed Batches', value: completedBatches + '/' + BATCHES.length, sub: '1 upcoming batch', icon: '✅', color: '#f59e0b' },
+    { label: 'Amount Transferred', value: fmtL(transferred), sub: 'Actual payments received', icon: '📤', color: '#14b8a6' },
+    { label: 'Pending Transfer', value: fmtL(totalNet - transferred), sub: 'Yet to be received', icon: '⏳', color: '#ef4444' },
+  ];
+
+  const grid = document.getElementById('kpiGrid');
+  grid.innerHTML = kpis.map(k => `
+    <div class="kpi-card" style="--accent-color:${k.color}">
+      <div class="label">${k.label}</div>
+      <div class="value" style="color:${k.color}">${k.value}</div>
+      <div class="sub">${k.sub}</div>
+      <div class="icon">${k.icon}</div>
+    </div>
+  `).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// BATCH TABLE
+// ══════════════════════════════════════════════════════════
+function buildBatchTable() {
+  const tbody = document.getElementById('batchTbody');
+  const tfoot = document.getElementById('batchFoot');
+  let totalGross = 0, totalTDS = 0, totalNet = 0, totalStudents = 0;
+
+  tbody.innerHTML = BATCHES.map(b => {
+    const tds = Math.round(b.gross * b.tdsRate);
+    const net = b.gross - tds;
+    totalGross += b.gross; totalTDS += tds; totalNet += net; totalStudents += b.students;
+    const pct = Math.round((b.students / 290) * 100);
+    return `
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="width:10px;height:10px;border-radius:50%;background:${b.color};display:inline-block;flex-shrink:0"></span>
+            <strong>${b.name}</strong>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;padding-left:18px">${b.formula}</div>
+          <div class="progress-bar-bg" style="margin-left:18px">
+            <div class="progress-bar-fill" style="width:${pct}%;background:${b.color}"></div>
+          </div>
+        </td>
+        <td><span class="badge-pill pill-blue">${b.type}</span></td>
+        <td class="num">${b.students}</td>
+        <td class="num">${fmt(b.gross)}</td>
+        <td class="num" style="color:var(--red)">(${fmt(tds)})</td>
+        <td class="num" style="color:var(--green);font-weight:700">${fmt(net)}</td>
+        <td><span class="badge-pill ${b.statusClass}">${b.status}</span></td>
+      </tr>
+    `;
+  }).join('');
+
+  tfoot.innerHTML = `
+    <tr>
+      <td colspan="2" style="padding:14px 16px;font-weight:700">TOTAL</td>
+      <td class="num" style="padding:14px 16px">${totalStudents}</td>
+      <td class="num" style="padding:14px 16px">${fmt(totalGross)}</td>
+      <td class="num" style="padding:14px 16px;color:var(--red)">(${fmt(totalTDS)})</td>
+      <td class="num" style="padding:14px 16px;color:var(--green)">${fmt(totalNet)}</td>
+      <td style="padding:14px 16px"></td>
+    </tr>
+  `;
+}
+
+// ══════════════════════════════════════════════════════════
+// CHARTS
+// ══════════════════════════════════════════════════════════
+function buildCharts() {
+  const labels = BATCHES.map(b => b.name);
+  const grossVals = BATCHES.map(b => b.gross);
+  const netVals = BATCHES.map(b => b.gross - Math.round(b.gross * b.tdsRate));
+  const colors = BATCHES.map(b => b.color);
+
+  new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Gross Revenue', data: grossVals, backgroundColor: colors.map(c => c + 'cc'), borderRadius: 4 },
+        { label: 'Net (after TDS)', data: netVals, backgroundColor: colors.map(c => c + '55'), borderRadius: 4 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#1e293b' } },
+        y: {
+          ticks: { color: '#94a3b8', font: { size: 10 }, callback: v => '₹' + (v/100000).toFixed(1) + 'L' },
+          grid: { color: '#334155' },
+        },
+      },
+    },
+  });
+
+  new Chart(document.getElementById('pieChart'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: BATCHES.map(b => b.students), backgroundColor: colors, borderWidth: 2, borderColor: '#1e293b' }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} students` } },
+      },
+    },
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// CALC CARDS
+// ══════════════════════════════════════════════════════════
+function buildCalcCards() {
+  const grid = document.getElementById('calcGrid');
+  grid.innerHTML = BATCHES.map(b => {
+    const tds = Math.round(b.gross * b.tdsRate);
+    const net = b.gross - tds;
+    return `
+      <div class="calc-card">
+        <div class="batch-name">
+          <span class="dot" style="background:${b.color}"></span>
+          ${b.name} <span style="color:var(--muted);font-size:11px;font-weight:400;margin-left:4px">${b.type}</span>
+        </div>
+        <div class="calc-row"><span class="clabel">Students</span><span class="cval">${b.students}</span></div>
+        <div class="calc-row"><span class="clabel">Formula</span><span class="cval" style="font-size:11px;text-align:right;max-width:60%">${b.formula}</span></div>
+        <div class="calc-row total"><span class="clabel">Gross Revenue</span><span class="cval">${fmt(b.gross)}</span></div>
+        <div class="calc-row tds"><span class="clabel">TDS (10%)</span><span class="cval">−${fmt(tds)}</span></div>
+        <div class="calc-row net"><span class="clabel">Net Payable</span><span class="cval">${fmt(net)}</span></div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// TRANSFER TIMELINE
+// ══════════════════════════════════════════════════════════
+function buildTimeline() {
+  const total = TRANSFERS.reduce((s, t) => s + t.amount, 0);
+  const el = document.getElementById('timeline');
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Transfer History</h3>
+      <span style="font-size:13px;color:var(--green);font-weight:700">Total: ${fmt(total)}</span>
+    </div>
+    ${TRANSFERS.map((t, i) => `
+      <div class="tl-item">
+        <div class="tl-dot" style="background:var(--accent)">${i + 1}</div>
+        <div class="tl-content">
+          <h4>${t.batch} &nbsp;<span style="color:var(--green);font-size:13px">${fmt(t.amount)}</span></h4>
+          <p>${t.date} · ${t.note}</p>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+// ══════════════════════════════════════════════════════════
+// STUDENT TABLE with TABS
+// ══════════════════════════════════════════════════════════
+let activeTab = 'nov24';
+
+function buildTabs() {
+  const bar = document.getElementById('tabBar');
+  bar.innerHTML = BATCHES.map(b => `
+    <button class="tab-btn ${b.id === activeTab ? 'active' : ''}" onclick="switchTab('${b.id}')">${b.name}</button>
+  `).join('');
+}
+
+function switchTab(id) {
+  activeTab = id;
+  buildTabs();
+  renderStudents();
+}
+
+function renderStudents() {
+  const rows = STUDENTS[activeTab] || [];
+  const tbody = document.getElementById('studentTbody');
+  tbody.innerHTML = rows.map((r, i) => {
+    const [name, email, status, amount] = r;
+    let pillClass = 'pill-gray';
+    if (status.toLowerCase().includes('100') || status.toLowerCase() === 'paid' || status.toLowerCase().includes('full')) pillClass = 'pill-green';
+    else if (status.toLowerCase().includes('50') || status.toLowerCase().includes('75')) pillClass = 'pill-yellow';
+    else if (status.toLowerCase().includes('upcoming')) pillClass = 'pill-blue';
+    return `
+      <tr>
+        <td style="color:var(--muted)">${i + 1}</td>
+        <td><strong>${name}</strong></td>
+        <td style="color:var(--muted);font-size:12px">${email}</td>
+        <td><span class="badge-pill ${pillClass}">${status}</span></td>
+        <td class="num" style="color:var(--green);font-weight:600">${fmt(amount)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════
+buildKPI();
+buildBatchTable();
+buildCharts();
+buildCalcCards();
+buildTimeline();
+buildTabs();
+renderStudents();
+</script>
+</body>
+</html>
